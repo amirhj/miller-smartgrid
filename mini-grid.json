@@ -1,0 +1,33 @@
+{
+	"nodes": {
+		"v3": {
+			"load": -10,
+			"generator": 30,
+			"CI": 0.3,
+			"children": ["v5"]
+		},
+		"v5": {
+			"load": -10,
+			"generator": 20,
+			"CI": 0.7,
+			"children": ["v8", "v9"]
+		},
+		"v8": {
+			"load": -40,
+			"generator": 40,
+			"CI": 0.25,
+			"children": []
+		},
+		"v9": {
+			"load": -10,
+			"generator": 30,
+			"CI": 0.1,
+			"children": []
+		}
+	},
+	"connections": {
+		"v3-v5": 100,
+		"v5-v8": 20,
+		"v5-v9": 40
+	}
+}
