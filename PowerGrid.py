@@ -26,7 +26,9 @@ class Node:
         return self.powerGrid.grid[self.parent]
 
     def readMessageBox(self):
-        return { m.sender: m for m in self.messageBox }
+        messages = { m.sender: m for m in self.messageBox }
+        del self.messageBox[:]
+        return messages
 
     def calculateValues(self):
         self.values = []
@@ -44,25 +46,26 @@ class Node:
                 isFirst = True
                 minPowerCost = 0
                 minPCState = None
-                CCI = [ -1 for m in self.messageBox]
+                # Message Matrix Columns Indecies
+                MMCI = { m:0 for m in messages }
                 rFlow = 0
 
                 # making cartesian product of children's messages and choosing the one with minimum cost
-                while CCI[0] < len(self.messageBox):
-                    rCO = self.CI*a + sum([ self.messageBox[j][1][CCI[j]][1] for j in range(len(self.messageBox))])
+                while MMCI[0] < len(messages):
+                    rCO = self.CI*a + sum([ messages[m].content[MMCI[m]][1] for m in messages])
 
                     # choosing minimum cost
                     if isFirst or rCO < minPowerCost:
                         minPowerCost = rCO
-                        minPCState = tuple([ (self.messageBox[j][0], self.messageBox[j][1][CCI[j]]) for j in range(len(self.messageBox))])
-                        rFlow = a + self.load + sum([ self.messageBox[j][1][CCI[j]][0] for j in range(len(self.messageBox))])
+                        minPCState = tuple([ (m, messages[m].content[ MMCI[m] ]) for m in messages ])
+                        rFlow = a + self.load + sum([ messages[m].content[ MMCI[m] ][0] for m in messages ])
                         isFirst = False
 
-                    for i in reversed(range(len(self.messageBox)):
-                        if CCI[i] < len(self.messageBox[i]):
-                            CCI[i] += 1
-                            if CCI[i] == len(self.messageBox[i]):
-                                CCi[i] = 0
+                    for i in reversed(messages.keys()):
+                        if MMCI[i] < len(messages[i].content):
+                            MMCI[i] += 1
+                            if MMCI[i] == len(messages[i].content):
+                                MMCI[i] = 0
                             else:
                                 break
 
@@ -72,40 +75,42 @@ class Node:
                 self.PCStates[flowCO] = minPCState
 
         self.sendMessageToParent()
-        del self.messageBox[:]
 
     def sendMessageToParent(self):
         if not self.isRoot():
-            self.powerGrid.grid[self.parnet].messageBox.append((self.id, self.values))
+            m = Message(self.id, self.parnet, self.values)
+            self.powerGrid.grid[self.parnet].messageBox.append(m)
 
     def propagateValue(self):
         self.finalResult = None
+        messages = self.readMessageBox()
         if self.isRoot():
             isFirst = True
             minPowerCost = 0
             minPCState = None
             minGenerator = 0
-            CCI = [ -1 for m in self.messageBox]
+            # Message Matrix Columns Indecies
+            MMCI = { m:0 for m in messages }
             rFlow = 0
 
             for a in range(self.generator):
                 # making cartesian product of children's messages and choosing the one with minimum cost
-                while CCI[0] < len(self.messageBox):
-                    rCO = self.CI*a + sum([ self.messageBox[j][1][CCI[j]][1] for j in range(len(self.messageBox))])
+                while MMCI[0] < len(messages):
+                    rCO = self.CI*a + sum([ messages[m].content[MMCI[m]][1] for m in messages])
 
                     # choosing minimum cost
                     if isFirst or rCO < minPowerCost:
                         minPowerCost = rCO
-                        minPCState = tuple([ (self.messageBox[j][0], self.messageBox[j][1][CCI[j]]) for j in range(len(self.messageBox))])
-                        rFlow = a + self.load + sum([ self.messageBox[j][1][CCI[j]][0] for j in range(len(self.messageBox))])
+                        minPCState = tuple([ (m, messages[m].content[ MMCI[m] ]) for m in messages ])
+                        rFlow = a + self.load + sum([ messages[m].content[ MMCI[m] ][0] for m in messages ])
                         minGenerator = a
                         isFirst = False
 
-                    for i in reversed(range(len(self.messageBox)):
-                        if CCI[i] < len(self.messageBox[i]):
-                            CCI[i] += 1
-                            if CCI[i] == len(self.messageBox[i]):
-                                CCi[i] = 0
+                    for i in reversed(messages.keys()):
+                        if MMCI[i] < len(messages[i].content):
+                            MMCI[i] += 1
+                            if MMCI[i] == len(messages[i].content):
+                                MMCI[i] = 0
                             else:
                                 break
 
@@ -115,15 +120,17 @@ class Node:
 
             self.propagateValueToChildren(minPCState)
         else:
-            if self.messageBox[0][0] == self.parnet:
-                optimalFlowCO = self.messageBox[0]
+            messages = self.readMessageBox()
+            if self.parnet in messages:
+                optimalFlowCO = messages[self.parnet].content[0]
                 self.finalResult = (optimalFlowCO[0], optimalFlowCO[1], self.OPCStates[optimalFlowCO])
                 if not self.isLeaf():
                     self.propagateValueToChildren(self.PCStates[optimalFlowCO])
 
     def propagateValueToChildren(self, messages):
         for m in messages:
-            self.powerGrid.grid[m[0]].messageBox.append((self.id, m[1]))
+            message = Message(self.id, m[0], m[1])
+            self.powerGrid.grid[m[0]].messageBox.append(message)
 
 class PowerGrid:
     def __init__(self, gridJSON):
