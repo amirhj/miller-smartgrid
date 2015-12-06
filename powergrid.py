@@ -37,7 +37,7 @@ class Node:
         self.values = []
 
         if self.isLeaf():
-            for a in range(self.generator):
+            for a in range(self.generator+1):
                 rFlow = a + self.load
                 flowCO = (rFlow, a*self.CI)
                 self.OPCStates[flowCO] = a
@@ -45,7 +45,7 @@ class Node:
         else:
             self.PCStates = {}
             messages = self.readMessageBox()
-            for a in range(self.generator):
+            for a in range(self.generator+1):
                 isFirst = True
                 minPowerCost = 0
                 minPCState = None
@@ -84,7 +84,7 @@ class Node:
     def sendMessageToParent(self):
         if not self.isRoot():
             m = Message(self.id, self.parent, self.values)
-            print "Node ",self.id," to parent ",self.parent,self.values
+            print "Node ",self.id," to parent ",self.parent,self.values," ",len(self.values)
             self.powerGrid.grid[self.parent].messageBox.append(m)
 
     def propagateValues(self):
@@ -98,18 +98,20 @@ class Node:
             # Message Matrix Columns Indecies
             MMCI = { m:0 for m in messages }
             rFlow = 0
+            minFlow = 0
 
-            for a in range(self.generator):
+            for a in range(self.generator+1):
                 # making cartesian product of children's messages and choosing the one with minimum cost
                 first = messages.keys()[0]
                 while MMCI[first] < len(messages[first].content):
-                    rCO = self.CI*a + sum([ messages[m].content[MMCI[m]][1] for m in messages])
+                    rFlow = a + self.load + sum([ messages[m].content[ MMCI[m] ][0] for m in messages ])
 
                     # choosing minimum cost
-                    if isFirst or rCO < minPowerCost:
+                    if isFirst or abs(rFlow - 0) < abs(minFlow - 0):
+                        minFlow = rFlow
+                        rCO = self.CI*a + sum([ messages[m].content[MMCI[m]][1] for m in messages])
                         minPowerCost = rCO
                         minPCState = tuple([ (m, messages[m].content[ MMCI[m] ]) for m in messages ])
-                        rFlow = a + self.load + sum([ messages[m].content[ MMCI[m] ][0] for m in messages ])
                         minGenerator = a
                         isFirst = False
 
@@ -126,6 +128,9 @@ class Node:
             flowCO = (rFlow, minPowerCost)
             self.OPCStates[flowCO] = minGenerator
 
+            print "Final result in root node:"
+            print "rFlow: ",rFlow, ", minPowerCost: ", minPowerCost, ", minGenerator: ",minGenerator
+
             self.propagateValueToChildren(minPCState)
         else:
             if self.parent in messages:
@@ -134,10 +139,13 @@ class Node:
                 if not self.isLeaf():
                     self.propagateValueToChildren(self.PCStates[optimalFlowCO])
 
+                print "Final result in node ",self.id, ":"
+                print "rFlow: ",optimalFlowCO[0], ", minPowerCost: ", optimalFlowCO[1], ", minGenerator: ",self.OPCStates[optimalFlowCO]
+
     def propagateValueToChildren(self, messages):
         for m in messages:
             message = Message(self.id, m[0], m[1])
-            print "Node ",self.id," to child ",m[0], m[1]
+            print "Message from node ",self.id," to child ",m[0],': ', m[1]
             self.powerGrid.grid[m[0]].messageBox.append(message)
 
     def isReady(self):

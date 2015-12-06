@@ -16,7 +16,7 @@ class Scheduler:
                     oneIsReady = True
                     self.clock += 1
                     print "clock ",self.clock,": Node ",n.id," is running..."
-                    print { self.pg.grid[n].id:self.pg.grid[n].state for n in self.pg.grid }
+                    #print { self.pg.grid[n].id:self.pg.grid[n].state for n in self.pg.grid }
                     n.run()
                     if self.stepByStep:
                         return
