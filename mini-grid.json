@@ -1,29 +1,37 @@
 {
 	"nodes": {
 		"v3": {
-			"load": -10,
-			"generator": 30,
-			"CI": 0.3,
+			"loads": ["l3"],
+			"generators": ["g1"],
 			"children": ["v5"]
 		},
 		"v5": {
-			"load": -10,
-			"generator": 20,
-			"CI": 0.7,
+			"loads": ["l5"],
+			"generators": ["g2"],
 			"children": ["v8", "v9"]
 		},
 		"v8": {
-			"load": -40,
-			"generator": 40,
-			"CI": 0.25,
+			"loads": ["l8"],
+			"generators": ["g4"],
 			"children": []
 		},
 		"v9": {
-			"load": -10,
-			"generator": 30,
-			"CI": 0.1,
+			"loads": ["l9"],
+			"generators": ["g5"],
 			"children": []
 		}
+	},
+	"generators": {
+		"g1": { "max_out": 30, "CI": 0.3 },
+		"g2": { "max_out": 20, "CI": 0.7 },
+		"g4": { "max_out": 40, "CI": 0.25 },
+		"g5": { "max_out": 30, "CI": 0.1 }
+	},
+	"loads": {
+		"l3": -10,
+		"l5": -10,
+		"l8": -40,
+		"l9": -10
 	},
 	"connections": {
 		"v3-v5": 100,

@@ -1,18 +1,14 @@
 class Node:
-    def __init__(self, id, load, generator, CI, parent=None):
+    def __init__(self, id, loads, generators, powergrid, parent=None):
         self.id = id
-        self.load = load
-        self.generator = generator
+        self.powerGrid = powergrid
+        self.loads = { l:self.powerGrid.loads[l] for l in loads }
+        self.generators = { g:self.powerGrid.generators[g] for g in generators }
         self.parent = parent
         self.messageBox = []
-        self.powerGrid = None
         self.OPCStates = {}
-        self.CI = CI
         # state are 1: Waiting for doing phase1, 2: Waiting for doing phase2
         self.state = 1
-
-    def setPoweGrid(self, pg):
-        self.powerGrid = pg
 
     def isRoot(self):
         if self.parent == None:
@@ -37,47 +33,90 @@ class Node:
         self.values = []
 
         if self.isLeaf():
-            for a in range(self.generator+1):
-                rFlow = a + self.load
-                flowCO = (rFlow, a*self.CI)
-                self.OPCStates[flowCO] = a
+            # Cartesian Product Matrix columns Indecies of Messages and their size
+            CPMGI = { g:{ 'index':0, 'size':len(self.generators[g].values) } for g in self.generators }
+
+            # making cartesian product of generators values
+            firstG = self.generators.keys()[0]
+            while CPMGI[firstG]['index'] < CPMGI[firstG]['size']:
+                sum_generators_outputs = sum([ self.generators[g].values[ CPMGI[g]['index'] ] for g in self.generators ])
+                sum_loads = sum(self.loads.values())
+                rFlow = sum_generators_outputs + sum_loads
+
+                sum_costs_generators = sum([ self.generators[g].values[ CPMGI[g]['index'] ] * self.generators[g].CI for g in self.generators ])
+                flowCO = (rFlow, sum_costs_generators)
+                self.OPCStates[flowCO] = { g: self.generators[g].values[ CPMGI[g]['index'] ] for g in self.generators }
                 self.values.append(flowCO)
+
+                for i in reversed(self.generators.keys()):
+                    if CPMGI[i]['index'] < CPMGI[i]['size']:
+                        CPMGI[i]['index'] += 1
+                        if CPMGI[i]['index'] == CPMGI[i]['size']:
+                            if i != firstG:
+                                CPMGI[i]['index'] = 0
+                        else:
+                            break
         else:
+            # Minimum power cost state of childern for each flowCO
             self.PCStates = {}
+
             messages = self.readMessageBox()
-            for a in range(self.generator+1):
+
+            # Cartesian Product Matrix columns Indecies of Messages and their size
+            CPMGI = { g:{ 'index':0, 'size':len(self.generators[g].values) } for g in self.generators }
+
+            # making cartesian product of generators values
+            firstG = self.generators.keys()[0]
+            while CPMGI[firstG]['index'] < CPMGI[firstG]['size']:
                 isFirst = True
                 minPowerCost = 0
                 minPCState = None
-                # Message Matrix Columns Indecies
-                MMCI = { m:0 for m in messages }
                 rFlow = 0
 
+                # Cartesian Product Matrix columns Indecies of Messages and their size
+                CPMMI = { m:{ 'index':0, 'size':len(messages[m].content) } for m in messages }
+
                 # making cartesian product of children's messages and choosing the one with minimum cost
-                first = messages.keys()[0]
-                while MMCI[first] < len(messages[first].content):
-                    rCO = self.CI*a + sum([ messages[m].content[MMCI[m]][1] for m in messages])
+                firstM = messages.keys()[0]
+                while CPMMI[firstM]['index'] < CPMMI[firstM]['size']:
+                    sum_costs_generators = sum([ self.generators[g].values[ CPMGI[g]['index'] ] * self.generators[g].CI for g in self.generators ])
+                    sum_costs_children = sum([ messages[m].content[ CPMMI[m]['index'] ][1] for m in messages ])
+                    rCO = sum_costs_generators + sum_costs_children
 
                     # choosing minimum cost
                     if isFirst or rCO < minPowerCost:
                         minPowerCost = rCO
-                        minPCState = tuple([ (m, messages[m].content[ MMCI[m] ]) for m in messages ])
-                        rFlow = a + self.load + sum([ messages[m].content[ MMCI[m] ][0] for m in messages ])
+                        minPCState = tuple([ (m, messages[m].content[ CPMMI[m]['index'] ]) for m in messages ])
+
+                        sum_generators_outputs = sum([ self.generators[g].values[ CPMGI[g]['index'] ] for g in self.generators ])
+                        sum_flows_children = sum([ messages[m].content[ CPMMI[m]['index'] ][0] for m in messages ])
+                        sum_loads = sum(self.loads.values())
+                        rFlow = sum_generators_outputs + sum_loads + sum_flows_children
+
                         isFirst = False
 
                     for i in reversed(messages.keys()):
-                        if MMCI[i] < len(messages[i].content):
-                            MMCI[i] += 1
-                            if MMCI[i] == len(messages[i].content):
-                                if i != first:
-                                    MMCI[i] = 0
+                        if CPMMI[i]['index'] < CPMMI[firstM]['size']:
+                            CPMMI[i]['index'] += 1
+                            if CPMMI[i]['index'] == CPMMI[i]['size']:
+                                if i != firstM:
+                                    CPMMI[i]['index'] = 0
                             else:
                                 break
 
                 flowCO = (rFlow, minPowerCost)
-                self.OPCStates[flowCO] = a
+                self.OPCStates[flowCO] = { g: self.generators[g].values[ CPMGI[g]['index'] ] for g in self.generators }
                 self.values.append(flowCO)
                 self.PCStates[flowCO] = minPCState
+
+                for i in reversed(self.generators.keys()):
+                    if CPMGI[i]['index'] < CPMGI[i]['size']:
+                        CPMGI[i]['index'] += 1
+                        if CPMGI[i]['index'] == CPMGI[i]['size']:
+                            if i != firstG:
+                                CPMGI[i]['index'] = 0
+                        else:
+                            break
 
         self.sendMessageToParent()
 
@@ -95,34 +134,56 @@ class Node:
             minPowerCost = 0
             minPCState = None
             minGenerator = 0
-            # Message Matrix Columns Indecies
-            MMCI = { m:0 for m in messages }
             rFlow = 0
             minFlow = 0
 
-            for a in range(self.generator+1):
+            # Cartesian Product Matrix columns Indecies of Messages and their size
+            CPMGI = { g:{ 'index':0, 'size':len(self.generators[g].values) } for g in self.generators }
+
+            # making cartesian product of generators values
+            firstG = self.generators.keys()[0]
+            while CPMGI[firstG]['index'] < CPMGI[firstG]['size']:
+                # Cartesian Product Matrix columns Indecies of Messages and their size
+                CPMMI = { m:{ 'index':0, 'size':len(messages[m].content) } for m in messages }
+
                 # making cartesian product of children's messages and choosing the one with minimum cost
-                first = messages.keys()[0]
-                while MMCI[first] < len(messages[first].content):
-                    rFlow = a + self.load + sum([ messages[m].content[ MMCI[m] ][0] for m in messages ])
+                firstM = messages.keys()[0]
+                while CPMMI[firstM]['index'] < CPMMI[firstM]['size']:
+                    sum_generators_outputs = sum([ self.generators[g].values[ CPMGI[g]['index'] ] for g in self.generators ])
+                    sum_flows_children = sum([ messages[m].content[ CPMMI[m]['index'] ][0] for m in messages ])
+                    sum_loads = sum(self.loads.values())
+                    rFlow = sum_generators_outputs + sum_loads + sum_flows_children
 
                     # choosing minimum cost
                     if isFirst or abs(rFlow - 0) < abs(minFlow - 0):
                         minFlow = rFlow
-                        rCO = self.CI*a + sum([ messages[m].content[MMCI[m]][1] for m in messages])
+
+                        sum_costs_generators = sum([ self.generators[g].values[ CPMGI[g]['index'] ] * self.generators[g].CI for g in self.generators ])
+                        sum_costs_children = sum([ messages[m].content[ CPMMI[m]['index'] ][1] for m in messages ])
+                        rCO = sum_costs_generators + sum_costs_children
+
                         minPowerCost = rCO
-                        minPCState = tuple([ (m, messages[m].content[ MMCI[m] ]) for m in messages ])
-                        minGenerator = a
+                        minPCState = tuple([ (m, messages[m].content[ CPMMI[m]['index'] ]) for m in messages ])
+                        minGenerator = { g: self.generators[g].values[ CPMGI[g]['index'] ] for g in self.generators }
                         isFirst = False
 
                     for i in reversed(messages.keys()):
-                        if MMCI[i] < len(messages[i].content):
-                            MMCI[i] += 1
-                            if MMCI[i] == len(messages[i].content):
-                                if i != first:
-                                    MMCI[i] = 0
+                        if CPMMI[i]['index'] < CPMMI[firstM]['size']:
+                            CPMMI[i]['index'] += 1
+                            if CPMMI[i]['index'] == CPMMI[i]['size']:
+                                if i != firstM:
+                                    CPMMI[i]['index'] = 0
                             else:
                                 break
+
+                for i in reversed(self.generators.keys()):
+                    if CPMGI[i]['index'] < CPMGI[i]['size']:
+                        CPMGI[i]['index'] += 1
+                        if CPMGI[i]['index'] == CPMGI[i]['size']:
+                            if i != firstG:
+                                CPMGI[i]['index'] = 0
+                        else:
+                            break
 
             self.finalResult = (rFlow, minPowerCost, minGenerator)
             flowCO = (rFlow, minPowerCost)
@@ -180,26 +241,43 @@ class Node:
             elif self.state == 2:
                 self.propagateValues()
                 self.state = 1
+class Generator:
+    def __init__(self, id, max_out, CI):
+        self.id = id
+        self.max_out = max_out
+        self.CI = CI
+        self.values = range(self.max_out + 1)
 
 class PowerGrid:
     def __init__(self, gridJSON):
         self.grid = {}
         self.connections = {}
+        self.loads = {}
+        self.generators = {}
         self.leaves = []
-        self.gridJSON = gridJSON['nodes']
+        self.nodesJSON = gridJSON['nodes']
+        self.loadsJSON = gridJSON['loads']
+        self.generatorsJSON = gridJSON['generators']
         self.connectionsJSON = gridJSON['connections']
         self.initialize()
 
     def initialize(self):
+        # Loads
+        self.loads = self.loadsJSON
+
+        # Generators
+        for g in self.generatorsJSON:
+            self.generators[g] = Generator(g, self.generatorsJSON[g]['max_out'], self.generatorsJSON[g]['CI'])
+
         children = set()
         nodes = set()
-        for n in self.gridJSON:
+        for n in self.nodesJSON:
             nodes.add(n)
-            if 'children' in self.gridJSON[n]:
-                if len(self.gridJSON[n]['children']) == 0:
+            if 'children' in self.nodesJSON[n]:
+                if len(self.nodesJSON[n]['children']) == 0:
                     self.leaves.append(n)
                 else:
-                    for c in self.gridJSON[n]['children']:
+                    for c in self.nodesJSON[n]['children']:
                         children.add(c)
             else:
                 self.leaves.append(n)
@@ -208,11 +286,11 @@ class PowerGrid:
         if len(nodes - children) > 1:
             raise Exception('Error: More than one root found.')
 
-        for n in self.gridJSON:
+        for n in self.nodesJSON:
             # looking for parent of node n
             parent = []
-            for p in self.gridJSON:
-                if n in self.gridJSON[p]['children']:
+            for p in self.nodesJSON:
+                if n in self.nodesJSON[p]['children']:
                     parent.append(p)
 
             if len(parent) > 1:
@@ -223,9 +301,7 @@ class PowerGrid:
             else:
                 parent = None
 
-            node = Node(n, self.gridJSON[n]['load'], self.gridJSON[n]['generator'], self.gridJSON[n]['CI'], parent)
-            node.setPoweGrid(self)
-            self.grid[n] = node
+            self.grid[n] = Node(n, self.nodesJSON[n]['loads'], self.nodesJSON[n]['generators'], self, parent)
 
         # connections thermal capacities
         for c in self.connectionsJSON:
@@ -234,7 +310,10 @@ class PowerGrid:
             self.connections[(v2,v1)] = self.connectionsJSON[c]
 
     def getChildren(self, nodeId):
-        return self.gridJSON[nodeId]['children']
+        children = []
+        if 'children' in self.nodesJSON[nodeId]:
+            children = self.nodesJSON[nodeId]['children']
+        return children
 
     def isLeaf(self, nodeId):
         return nodeId in self.leaves
