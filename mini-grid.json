@@ -12,12 +12,12 @@
 		},
 		"v8": {
 			"loads": ["l8"],
-			"generators": ["g4"],
+			"generators": ["g4","i0"],
 			"children": []
 		},
 		"v9": {
 			"loads": ["l9"],
-			"generators": ["g5"],
+			"generators": ["g5", "i1"],
 			"children": []
 		}
 	},
@@ -25,7 +25,9 @@
 		"g1": { "max_out": 30, "CI": 0.3 },
 		"g2": { "max_out": 20, "CI": 0.7 },
 		"g4": { "max_out": 40, "CI": 0.25 },
-		"g5": { "max_out": 30, "CI": 0.1 }
+		"g5": { "max_out": 30, "CI": 0.1 },
+		"i0": {"average_out": 3, "sigma": 0.2, "prob": 0.7},
+		"i1": {"average_out": 3, "sigma": 0.1, "prob": 0.8}
 	},
 	"loads": {
 		"l3": -10,
