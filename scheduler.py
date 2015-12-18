@@ -42,18 +42,44 @@ class Scheduler:
         self.terminated = False
 
     def saveResults(self):
-        results = { 'connections' : {} }
+        results = { 'connections' : [] }
         for n in self.pg.grid:
             parentId = self.pg.grid[n].parent
             if parentId != None:
-                results['connections'][parentId + '-' + n] = self.pg.grid[n].finalResult[0]
-                results['connections'][n + '-' + parentId] = self.pg.grid[n].finalResult[0]
+                c = parentId + '-' + n
+                if c in self.pg.connectionsJSON:
+                    results['connections'].append( { 'id':c, 'value':self.pg.grid[n].finalResult[0], 'cap':self.pg.connectionsJSON[c], 'parent':parentId } )
+                c = n + '-' + parentId
+                if c in self.pg.connectionsJSON:
+                    results['connections'].append( { 'id':c, 'value':self.pg.grid[n].finalResult[0], 'cap':self.pg.connectionsJSON[c], 'parent':parentId } )
 
-        results['generators'] = { g:self.pg.generators[g].value for g in self.pg.generators }
+        results['generators'] = [ { 'id':g, 'value':self.pg.generators[g].value } for g in self.pg.generators ]
 
         self.results.append(results)
 
     def writeResults(self):
         out = open('results.txt', 'w')
-        out.write(json.dumps(self.results, indent=4))
+
+        edges = []
+        for c in self.pg.connectionsJSON:
+            v1, v2 = c.split('-')
+            edges.append({ 'id': c, 'from': v1, 'to': v2, 'label': str(self.pg.connectionsJSON[c]) + ' kW', 'width': 3 })
+
+        nodes = []
+        for n in self.pg.grid:
+            level = self.pg.levels[n]
+            node = { 'id': n, 'label': n, 'group': 'node', 'level':level }
+            nodes.append(node)
+            for g in self.pg.grid[n].generators:
+                if 'average_out' in self.pg.generatorsJSON[g]:
+                    nodes.append({ 'id': g, 'label': g, 'group': 'intermittent', 'level':level+1 })
+                else:
+                    nodes.append({ 'id': g, 'label': g, 'group': 'generator', 'level':level+1 })
+                edges.append({ 'from': n, 'to': g })
+            for l in self.pg.grid[n].loads:
+                nodes.append({ 'id': l, 'label': l+'='+str(self.pg.grid[n].loads[l])+' kW', 'group': 'load', 'level':level+1 })
+                edges.append({ 'from': n, 'to': l })
+
+        output = { 'iterations': self.results, 'nodes': nodes, 'edges': edges }
+        out.write(json.dumps(output, indent=4))
         out.close()

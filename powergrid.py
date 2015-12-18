@@ -365,6 +365,7 @@ class PowerGrid:
         self.loads = {}
         self.generators = {}
         self.leaves = []
+        self.levels = {}
         self.nodesJSON = gridJSON['nodes']
         self.loadsJSON = gridJSON['loads']
         self.generatorsJSON = gridJSON['generators']
@@ -422,6 +423,8 @@ class PowerGrid:
             self.connections[(v1,v2)] = self.connectionsJSON[c]
             self.connections[(v2,v1)] = self.connectionsJSON[c]
 
+        self.setLevels()
+
     def getChildren(self, nodeId):
         children = []
         if 'children' in self.nodesJSON[nodeId]:
@@ -430,6 +433,26 @@ class PowerGrid:
 
     def isLeaf(self, nodeId):
         return nodeId in self.leaves
+
+    def isRoot(self, nodeId):
+        return nodeId == self.root
+
+    def setLevels(self):
+        current_level_nodes = self.getChildren(self.root)
+        self.levels = { g:None for g in self.grid }
+        self.levels[self.root] = 0
+        current_level = 1
+        while len(current_level_nodes) > 0:
+            children_level_nodes = []
+            for p in current_level_nodes:
+                self.levels[p] = current_level
+                children = self.getChildren(p)
+                for c in children:
+                    self.levels[c] = current_level + 1
+                    children_level_nodes.append(c)
+
+            current_level += 1
+            current_level_nodes = children_level_nodes
 
 class Message:
     def __init__(self, sender, reciver, content):
