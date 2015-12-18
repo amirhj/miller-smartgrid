@@ -270,6 +270,8 @@ class Node:
             print "rFlow: ",rFlow, ", minPowerCost: ", minPowerCost, ", minGenerator: ",minGenerator
 
             self.propagateValueToChildren(minPCState)
+
+            self.saveGeneratorsStates(minGenerator)
         else:
             if self.parent in messages:
                 optimalFlowCO = messages[self.parent].content
@@ -280,8 +282,7 @@ class Node:
                 print "Final result in node ",self.id, ":"
                 print "rFlow: ",optimalFlowCO[0], ", minPowerCost: ", optimalFlowCO[1], ", minGenerator: ",self.OPCStates[optimalFlowCO]
 
-        #for cc in self.OPCStates:
-        #    self.generators[cc].value = self.OPCStates[cc]
+            self.saveGeneratorsStates(self.OPCStates[optimalFlowCO])
 
     def propagateValueToChildren(self, messages):
         for m in messages:
@@ -322,8 +323,13 @@ class Node:
                 self.propagateValues()
                 self.state = 1
                 self.isFinished = True
+
     def reset(self):
         self.isFinished = False
+
+    def saveGeneratorsStates(self, state):
+        for g in state:
+            self.generators[g].value = state[g]
 
 class Generator:
     def __init__(self, id, max_out, CI):
@@ -336,13 +342,14 @@ class Generator:
     def domain(self):
         return self.values
 
-class IntermittentGenerator:
+class IntermittentResource:
     def __init__(self, id, average_out, sigma, prob):
         self.id = id
         self.average_out = average_out
         self.sigma = sigma
         self.prob = prob
         self.CI = 0
+        self.value = None
 
     def domain(self):
         # return [0, ran.normal(self.average_out, self.sigma)]
@@ -371,7 +378,7 @@ class PowerGrid:
         # Generators
         for g in self.generatorsJSON:
             if 'average_out' in self.generatorsJSON[g]:
-                self.generators[g] = IntermittentGenerator(g, self.generatorsJSON[g]['average_out'], self.generatorsJSON[g]['sigma'], self.generatorsJSON[g]['prob'])
+                self.generators[g] = IntermittentResource(g, self.generatorsJSON[g]['average_out'], self.generatorsJSON[g]['sigma'], self.generatorsJSON[g]['prob'])
             else:
                 self.generators[g] = Generator(g, self.generatorsJSON[g]['max_out'], self.generatorsJSON[g]['CI'])
 

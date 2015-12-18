@@ -20,7 +20,6 @@ class Scheduler:
                     print
                     print "clock ",self.clock,": Node ",n.id," is running..."
                     print
-                    #print { self.pg.grid[n].id:self.pg.grid[n].state for n in self.pg.grid }
                     n.run()
                     if self.isFinished():
                         return
@@ -43,16 +42,18 @@ class Scheduler:
         self.terminated = False
 
     def saveResults(self):
-        results = {}
+        results = { 'connections' : {} }
         for n in self.pg.grid:
-            results[n] = self.pg.grid[n].finalResult
+            parentId = self.pg.grid[n].parent
+            if parentId != None:
+                results['connections'][parentId + '-' + n] = self.pg.grid[n].finalResult[0]
+                results['connections'][n + '-' + parentId] = self.pg.grid[n].finalResult[0]
+
+        results['generators'] = { g:self.pg.generators[g].value for g in self.pg.generators }
+
         self.results.append(results)
 
     def writeResults(self):
         out = open('results.txt', 'w')
-        ii = 1
-        for i in self.results:
-            out.write("interation "+str(ii)+":\n")
-            out.write(json.dumps(i, indent=4))
-            out.write("\n\n")
-            ii += 1
+        out.write(json.dumps(self.results, indent=4))
+        out.close()
