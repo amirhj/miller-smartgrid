@@ -3,7 +3,7 @@ Implementation of paper, Optimal Decentralised Dispatch of Embedded Generation i
 
 To run:
 <pre>
-	python dydop.py <input-file.json> -i <number of iterations> -p <port to display graphical result in default browser> <other options>
+	python dydop.py &lt;input-file.json&gt; -i &lt;number of iterations&gt; -p &lt;port to display graphical result in default browser&gt; &lt;other options&gt;
 
 </pre>
 NOTE: This program just works in debian based operating systems.
