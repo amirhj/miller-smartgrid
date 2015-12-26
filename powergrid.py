@@ -2,7 +2,7 @@ import numpy.random as ran
 import random, sys
 
 class Node:
-    def __init__(self, id, loads, generators, powergrid, parent=None):
+    def __init__(self, id, loads, generators, powergrid, parent=None, debugLevel=1):
         self.id = id
         self.powerGrid = powergrid
         self.loads = { l:self.powerGrid.loads[l] for l in loads }
@@ -15,6 +15,7 @@ class Node:
         self.isFinished = False
         self.stateLog = []
         self.PCStates = {}
+        self.debugLevel = debugLevel
 
     def isRoot(self):
         if self.parent == None:
@@ -173,7 +174,8 @@ class Node:
         if not self.isRoot():
             m = Message(self.id, self.parent, self.values)
             self.stateLog[-1]['sent'] = [{ 'to':self.parent, 'content':str(self.values) }]
-            print "Node ",self.id," to parent ",self.parent,self.values," ",len(self.values)
+            if self.debugLevel >= 2:
+                print "Node ",self.id," to parent ",self.parent,self.values," ",len(self.values)
             self.powerGrid.grid[self.parent].messageBox.append(m)
 
     def propagateValues(self):
@@ -208,7 +210,6 @@ class Node:
                         # choosing minimum cost
                         if isFirst or abs(rFlow) < abs(minFlow):
                             minFlow = rFlow
-                            print 'min is here'
 
                             sum_costs_generators = sum([ self.generators[g].domain()[ CPMGI[g]['index'] ] * self.generators[g].CI for g in self.generators ])
                             sum_costs_children = sum([ messages[m].content[ CPMMI[m]['index'] ][1] for m in messages ])
@@ -272,8 +273,9 @@ class Node:
             flowCO = (minFlow, minPowerCost)
             self.OPCStates[flowCO] = minGenerator
 
-            print "Final result in root node:"
-            print "rFlow: ",minFlow, ", minPowerCost: ", minPowerCost, ", minGenerator: ",minGenerator
+            if self.debugLevel >= 1:
+                print "Final result in root node:"
+                print "rFlow: ",minFlow, ", minPowerCost: ", minPowerCost, ", minGenerator: ",minGenerator
 
             self.propagateValueToChildren(minPCState)
 
@@ -285,8 +287,9 @@ class Node:
                 if not self.isLeaf():
                     self.propagateValueToChildren(self.PCStates[optimalFlowCO])
 
-                print "Final result in node ",self.id, ":"
-                print "rFlow: ",optimalFlowCO[0], ", minPowerCost: ", optimalFlowCO[1], ", minGenerator: ",self.OPCStates[optimalFlowCO]
+                if self.debugLevel >= 1:
+                    print "Final result in node ",self.id, ":"
+                    print "rFlow: ",optimalFlowCO[0], ", minPowerCost: ", optimalFlowCO[1], ", minGenerator: ",self.OPCStates[optimalFlowCO]
 
             self.saveGeneratorsStates(self.OPCStates[optimalFlowCO])
 
@@ -294,7 +297,10 @@ class Node:
         self.stateLog[-1]['sent'] = [ { 'to':m[0], 'content':str(m[1]) } for m in messages ]
         for m in messages:
             message = Message(self.id, m[0], m[1])
-            print "Message from node ",self.id," to child ",m[0],': ', m[1]
+
+            if self.debugLevel >= 2:
+                print "Message from node ",self.id," to child ",m[0],': ', m[1]
+
             self.powerGrid.grid[m[0]].messageBox.append(message)
 
     def isReady(self):
@@ -373,7 +379,7 @@ class IntermittentResource:
         return [0]
 
 class PowerGrid:
-    def __init__(self, gridJSON):
+    def __init__(self, gridJSON, debugLevel=1):
         self.grid = {}
         self.connections = {}
         self.loads = {}
@@ -384,6 +390,7 @@ class PowerGrid:
         self.loadsJSON = gridJSON['loads']
         self.generatorsJSON = gridJSON['generators']
         self.connectionsJSON = gridJSON['connections']
+        self.debugLevel = debugLevel
         self.initialize()
 
     def initialize(self):
@@ -429,7 +436,7 @@ class PowerGrid:
             else:
                 parent = None
 
-            self.grid[n] = Node(n, self.nodesJSON[n]['loads'], self.nodesJSON[n]['generators'], self, parent)
+            self.grid[n] = Node(n, self.nodesJSON[n]['loads'], self.nodesJSON[n]['generators'], self, parent, self.debugLevel)
 
         # connections thermal capacities
         for c in self.connectionsJSON:

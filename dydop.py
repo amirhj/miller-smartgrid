@@ -8,18 +8,20 @@ from argpareser import argparser
 
 args = argparser()
 gridJSON = json.loads(open(args['inputFile'], 'r').read())
-pg = PowerGrid(gridJSON)
+pg = PowerGrid(gridJSON, args['debugLevel'])
 iterations = int(args['iterations'])
 
-print "Number of nodes: ", len(pg.grid)
-print "Root node: ", pg.root
-print "Leaf nodes: ", ", ".join(pg.leaves)
-print
-
-sc = Scheduler(pg, args['stepByStep'])
-for i in range(iterations):
+if args['debugLevel'] >= 1:
+    print "Number of nodes: ", len(pg.grid)
+    print "Root node: ", pg.root
+    print "Leaf nodes: ", ", ".join(pg.leaves)
     print
-    print "iteration ",i+1,":"
+
+sc = Scheduler(pg, args['stepByStep'], args['debugLevel'])
+for i in range(iterations):
+    if args['debugLevel'] >= 1:
+        print
+        print "iteration ",i+1,":"
     if args['stepByStep']:
         while not sc.terminated:
             raw_input()

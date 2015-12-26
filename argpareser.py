@@ -2,6 +2,7 @@ import sys
 def argparser():
     keys = {\
         '-i':{'readValue':True,'default':1, 'name':'iterations'},\
+        '--debug':{'readValue':True,'default':1, 'name':'debugLevel'},\
         '-p':{'readValue':True,'default':8666, 'name':'port'},\
         '--step':{'readValue':False,'default':False, 'name':'stepByStep', 'binary': True},\
         '--convergence':{'readValue':False,'default':False, 'name':'convergence'},\
@@ -23,14 +24,15 @@ def argparser():
     while i < len(sys.argv):
         key = sys.argv[i]
         if key in keys:
-            if 'binary' in keys[key]:
-                if keys[key]['binary']:
-                    values[keys[key]['name']] = True
             if keys[key]['readValue']:
                 i += 1
                 values[keys[key]['name']] = sys.argv[i]
             else:
                 values[keys[key]['name']] = keys[key]['default']
+
+            if 'binary' in keys[key]:
+                if keys[key]['binary']:
+                    values[keys[key]['name']] = True
         else:
             val = key
         i += 1
@@ -40,4 +42,6 @@ def argparser():
             values[keys[key]['name']] = keys[key]['default']
 
     values['inputFile'] = val
+    values['debugLevel'] = int(values['debugLevel'])
+
     return values

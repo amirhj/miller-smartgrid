@@ -2,7 +2,7 @@ from powergrid import PowerGrid
 import json
 
 class Scheduler:
-    def __init__(self, powerGrid, stepByStep=False):
+    def __init__(self, powerGrid, stepByStep=False, debugLevel=1):
         self.pg = powerGrid
         self.stepByStep = stepByStep
         self.clock = 0
@@ -10,6 +10,7 @@ class Scheduler:
         self.results = []
         self.episodesLog = []
         self.states = { n:set() for n in self.pg.grid }
+        self.debugLevel = debugLevel
 
     def run(self):
         while not self.terminated:
@@ -19,9 +20,10 @@ class Scheduler:
                 if n.isReady():
                     oneIsReady = True
                     self.clock += 1
-                    print
-                    print "clock ",self.clock,": Node ",n.id," is running..."
-                    print
+                    if self.debugLevel >= 1:
+                        print
+                        print "clock ",self.clock,": Node ",n.id," is running..."
+                        print
                     n.run()
                     self.episodesLog.append({ 'node':node, 'state':n.stateLog[-1] })
                     if self.isFinished():
@@ -101,7 +103,4 @@ class Scheduler:
                 if not 'average_out' in self.pg.generatorsJSON[g]:
                     gens.append(g)
             gensG = sum([self.pg.grid[n].generators[g].value for g in gens])
-            #print self.pg.grid[n].PCStates
-            #pp = self.pg.grid[n].PCStates[(self.pg.grid[n].finalResult[0],self.pg.grid[n].finalResult[1])]
-            #load = sum(self.pg.grid[n].loads.values()) + sum([pp[c][0] for c in pp])
             self.states[n].add(str((self.pg.grid[n].finalResult[0], self.pg.grid[n].finalResult[2])))
