@@ -1,2 +1,11 @@
 # miller-smartgrid
-Implementation of paper, Optimal Decentralised Dispatch of Embedded Generation in the Smart Grid by Sam Miller et al.
+Implementation of paper, Optimal Decentralised Dispatch of Embedded Generation in the Smart Grid by Sam Miller et al. additionally with intermittent resources.
+
+To run:
+	python dydop.py <input-file.json> -i <number of iterations> -p <port to display graphical result in default browser> <other options>
+
+NOTE: This program just works in debian based operating systems.
+
+Example:
+	python dydop.py grid.json -i 12 -p 8000
+
