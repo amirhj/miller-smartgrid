@@ -69,6 +69,45 @@
   var stateLog = null;
   var current_step = 0;
   var states = null;
+  var dataNodes = null
+  var dataEdges = null;
+
+  function resetNetwork() {
+    nodes = new vis.DataSet(dataNodes);
+    edges = new vis.DataSet(dataEdges);
+
+    var container = document.getElementById('mynetwork');
+    var data = {
+      nodes: nodes,
+      edges: edges
+    };
+    var options = {
+      groups: {
+        generator: {
+          shape: 'image',
+          image: 'resources/symbol_ac.gif'
+        },
+        intermittent: {
+          shape: 'image',
+          image: 'resources/symbol_inter.png'
+        },
+        load: {
+          shape: 'triangle',
+          color: 'lime',
+          size: 15
+        },
+        node: {
+          color: {background:'cyan', border:'blue',highlight:{background:'red',border:'blue'},hover:{background:'white',border:'red'}}
+        }
+      },
+      layout: {
+        hierarchical: {
+          direction: 'UD'
+        }
+      }
+    };
+    network = new vis.Network(container, data, options);
+  }
 
   $(function() {
     $('#next-step').click(function() {
@@ -87,40 +126,12 @@
       url: 'results.txt',
       dataType: 'json',
       success: function(responce) {
-        nodes = new vis.DataSet(responce.nodes);
-        edges = new vis.DataSet(responce.edges);
+        data = responce;
 
-        var container = document.getElementById('mynetwork');
-        var data = {
-          nodes: nodes,
-          edges: edges
-        };
-        var options = {
-          groups: {
-            generator: {
-              shape: 'image',
-              image: 'resources/symbol_ac.gif'
-            },
-            intermittent: {
-              shape: 'image',
-              image: 'resources/symbol_inter.gif'
-            },
-            load: {
-              shape: 'triangle',
-              color: 'lime',
-              size: 15
-            },
-            node: {
-              color: {background:'cyan', border:'blue',highlight:{background:'red',border:'blue'},hover:{background:'white',border:'red'}}
-            }
-          },
-          layout: {
-            hierarchical: {
-              direction: 'UD'
-            }
-          }
-        };
-        network = new vis.Network(container, data, options);
+        dataNodes = responce.nodes;
+        dataEdges = responce.edges;
+
+        resetNetwork();
 
         for(var i=0; i < responce.iterations.length; i++) {
           $('#iterations').append('<li class="iteration">iteration '+(i+1)+' <input type="hidden" value="'+i+'" /></li>');
@@ -157,6 +168,10 @@
   });
 
   function applyIteration(number) {
+    network.destroy();
+    network = null;
+    resetNetwork();
+
     iter = iterations[number];
     for(var i=0; i < iter.generators.length; i++) {
       var node = nodes.get(iter.generators[i].id);
