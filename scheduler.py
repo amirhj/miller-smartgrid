@@ -8,6 +8,8 @@ class Scheduler:
         self.clock = 0
         self.terminated = False
         self.results = []
+        self.episodesLog = []
+        self.states = { n:set() for n in self.pg.grid }
 
     def run(self):
         while not self.terminated:
@@ -21,6 +23,7 @@ class Scheduler:
                     print "clock ",self.clock,": Node ",n.id," is running..."
                     print
                     n.run()
+                    self.episodesLog.append({ 'node':node, 'state':n.stateLog[-1] })
                     if self.isFinished():
                         return
                     if self.stepByStep:
@@ -53,9 +56,11 @@ class Scheduler:
                 if c in self.pg.connectionsJSON:
                     results['connections'].append( { 'id':c, 'value':self.pg.grid[n].finalResult[0], 'cap':self.pg.connectionsJSON[c], 'parent':parentId } )
 
-        results['generators'] = [ { 'id':g, 'value':self.pg.generators[g].value } for g in self.pg.generators ]
+        results['generators'] = [ { 'id':g, 'value':self.pg.generators[g].value, 'max_out':self.pg.generators[g].max_out } for g in self.pg.generators ]
 
         self.results.append(results)
+
+        self.createStates()
 
     def writeResults(self):
         out = open('results.txt', 'w')
@@ -79,7 +84,24 @@ class Scheduler:
             for l in self.pg.grid[n].loads:
                 nodes.append({ 'id': l, 'label': l+'='+str(self.pg.grid[n].loads[l])+' kW', 'group': 'load', 'level':level+1 })
                 edges.append({ 'from': n, 'to': l })
+        states = { n: [str(i) for i in list(self.states[n])] for n in self.states }
 
-        output = { 'iterations': self.results, 'nodes': nodes, 'edges': edges }
+        output = { 'iterations': self.results, 'nodes': nodes, 'edges': edges, 'log': self.episodesLog, 'states': states }
+
+        output['log'] = self.episodesLog
+        output['states'] = states
+
         out.write(json.dumps(output, indent=4))
         out.close()
+
+    def createStates(self):
+        for n in self.pg.grid:
+            gens = []
+            for g in self.pg.grid[n].generators:
+                if not 'average_out' in self.pg.generatorsJSON[g]:
+                    gens.append(g)
+            gensG = sum([self.pg.grid[n].generators[g].value for g in gens])
+            #print self.pg.grid[n].PCStates
+            #pp = self.pg.grid[n].PCStates[(self.pg.grid[n].finalResult[0],self.pg.grid[n].finalResult[1])]
+            #load = sum(self.pg.grid[n].loads.values()) + sum([pp[c][0] for c in pp])
+            self.states[n].add(str((self.pg.grid[n].finalResult[0], self.pg.grid[n].finalResult[2])))

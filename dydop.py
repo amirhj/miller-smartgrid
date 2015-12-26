@@ -31,6 +31,7 @@ for i in range(iterations):
 
 sc.writeResults()
 PORT = 8666
+print args['stepByStep']
 
 Handler = SimpleHTTPServer.SimpleHTTPRequestHandler
 

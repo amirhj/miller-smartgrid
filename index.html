@@ -21,7 +21,7 @@
         height: 600px;
         /*border: 1px solid lightgray;*/
       }
-      #iterations li {
+      .select-list li {
         list-style-type: none;
         margin-top: 5px;
         margin-bottom: 5px;
@@ -36,15 +36,23 @@
   <div class="row">
     <div class="col-md-8" id="mynetwork"></div>
     <div class="col-md-4">
+      <div id="state-detail" style="width:100%;height:200px;background-color:#F7EF7E;padding:0.5em;margin-bottom:1em;overflow-y:auto;"></div>
+      <div>
       <ul class="nav nav-tabs">
         <li class="active"><a data-toggle="tab" href="#iter-tab">Iterations</a></li>
         <li><a data-toggle="tab" href="#step-tab">Steps</a></li>
       </ul>
       <div class="tab-content">
         <div id="iter-tab" class="tab-pane fade in active">
-          <ul id="iterations"></ul>
+          <ul class="select-list" id="iterations"></ul>
         </div>
         <div id="step-tab" class="tab-pane fade">
+          <div id="step-detail" style="width:100%;height:200px;background-color:#F7EF7E;padding:0.5em;margin-bottom:1em;overflow-y:auto;"></div>
+          <div>
+            <button class="btn btn-danger" id="next-step">Next</button>
+            <button class="btn btn-danger" id="prev-step">Previous</button>
+          </div>
+          <ul class="select-list" id="step-list"></ul>
         </div>
       </div>
     </div>
@@ -58,8 +66,23 @@
   var nodes = null;
   var edges = null;
   var network = null;
+  var stateLog = null;
+  var current_step = 0;
+  var states = null;
 
   $(function() {
+    $('#next-step').click(function() {
+      current_step += 1;
+      if(current_step == stateLog.length)
+        current_step = 0;
+      applyStep(current_step);
+    });
+    $('#prev-step').click(function() {
+      current_step -= 1;
+      if(current_step == -1)
+        current_step = stateLog.length -1;
+      applyStep(current_step);
+    });
     $.ajax({
       url: 'results.txt',
       dataType: 'json',
@@ -86,6 +109,9 @@
               shape: 'triangle',
               color: 'lime',
               size: 15
+            },
+            node: {
+              color: {background:'cyan', border:'blue',highlight:{background:'red',border:'blue'},hover:{background:'white',border:'red'}}
             }
           },
           layout: {
@@ -105,32 +131,72 @@
           applyIteration($(this).find('input').val());
         });
 
+        for(var i=0; i < responce.log.length; i++) {
+          $('#step-list').append('<li class="step">Step '+(i+1)+' <input type="hidden" value="'+i+'" /></li>');
+        }
+        $('.step').click(function() {
+          current_step = parseInt($(this).find('input').val());
+          applyStep(current_step);
+        });
+
         iterations = responce.iterations;
+        stateLog = responce.log;
+        states = responce.states;
+
+        network.on("click", function (params) {
+          ss = '';
+          for(var i=0; i < states[params.nodes[0]].length; i++) {
+            ss += states[params.nodes[0]][i]+'<br/>';
+          }
+          $('#state-detail').html(params.nodes[0]+'<br/>----------------------------<br/>'+ss.replace(/\"/g,'')
+          .replace(/\'/g,'')
+          .replace(/u/g,''));
+        });
       }
     });
   });
 
   function applyIteration(number) {
-    console.log(number);
     iter = iterations[number];
-    console.log(iter);
     for(var i=0; i < iter.generators.length; i++) {
       var node = nodes.get(iter.generators[i].id);
-      node.label = iter.generators[i].id + '=' + iter.generators[i].value + ' kW';
+      console.log(iter.generators[i].id);
+      node.label = iter.generators[i].id + '=' + iter.generators[i].value + '/'+iter.generators[i].max_out+' kW';
       nodes.update(node);
     }
     for(var i=0; i < iter.connections.length; i++) {
       var edge = edges.get(iter.connections[i].id);
       edge.label = iter.connections[i].value + '/' + iter.connections[i].cap + ' kW';
-      console.log(iter.connections[i].cap);
-      console.log(edge.to+','+edge.from+','+iter.connections[i].parent);
+      edge.arrows = {};
+      edges.update(edge);
       if(iter.connections[i].value > 0) {
-        edge.arrows = (edge.to == iter.connections[i].parent) ? 'from' : 'to';
-      } else {
         edge.arrows = (edge.to == iter.connections[i].parent) ? 'to' : 'from';
+      } else {
+        edge.arrows = (edge.to == iter.connections[i].parent) ? 'from' : 'to';
       }
       edges.update(edge);
     }
+  }
+
+  function applyStep(number) {
+    $('.step').removeClass('selected-iteration');
+    $('.step input[value="'+number+'"]').parent().addClass('selected-iteration');
+
+    var step = stateLog[number];
+    network.selectNodes([step.node]);
+    sent = '';
+    if (typeof(step.state.sent) !== 'undefined') {
+      for(var i=0; i<step.state.sent.length; i++) {
+        sent += '<b>'+step.state.sent[i].to+' <-- </b>'+step.state.sent[i].content+'<br/><br/>';
+      }
+    }
+    recived = '';
+    if (typeof(step.state.recived) !== 'undefined') {
+      for(var i=0; i<step.state.recived.length; i++) {
+        sent += '<b>'+step.state.recived[i].from+' --> </b>'+step.state.recived[i].content+'<br/><br/>';
+      }
+    }
+    $('#step-detail').html(step.node+'<br/>----------------------------<br/><b>Sent:</b><br/>'+sent+'<br/><b>Recived:</b>'+recived);
   }
 </script>
 </body>
